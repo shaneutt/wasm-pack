@@ -5,6 +5,7 @@ use binary_install::{Cache, Download};
 use child;
 use emoji;
 use failure::{self, ResultExt};
+use install;
 use log::debug;
 use log::{info, warn};
 use std::env;
@@ -29,6 +30,16 @@ pub enum Status {
     PlatformNotSupported,
     /// We found `wasm-opt` at the specified path
     Found(PathBuf),
+}
+
+pub fn get_tool_path(status: &Status, tool: Tool) -> Result<PathBuf, failure::Error> {
+    match status {
+        Status::Found(path) => Ok(path.to_path_buf()),
+        Status::CannotInstall => bail!("Not able to find or install a local {}.", tool),
+        install::Status::PlatformNotSupported => {
+            bail!("{} does not currently support your platform.", tool)
+        }
+    }
 }
 
 /// Install a cargo CLI tool

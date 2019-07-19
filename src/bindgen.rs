@@ -3,7 +3,7 @@
 use child;
 use command::build::{BuildProfile, Target};
 use failure::{self, ResultExt};
-use install;
+use install::{self, Tool};
 use manifest::CrateData;
 use semver;
 use std::path::{Path, PathBuf};
@@ -13,7 +13,7 @@ use std::process::Command;
 /// `.wasm`.
 pub fn wasm_bindgen_build(
     data: &CrateData,
-    bindgen: &install::Status,
+    install_status: &install::Status,
     out_dir: &Path,
     out_name: &Option<String>,
     disable_dts: bool,
@@ -39,24 +39,16 @@ pub fn wasm_bindgen_build(
     } else {
         "--typescript"
     };
-    let bindgen_path: Result<&PathBuf, failure::Error> = match bindgen {
-        install::Status::Found(path) => Ok(path),
-        install::Status::CannotInstall => {
-            bail!("Not able to find or install a local wasm-bindgen.")
-        }
-        install::Status::PlatformNotSupported => {
-            bail!("wasm-bindgen does not currently support your platform.")
-        }
-    };
+    let bindgen_path = install::get_tool_path(install_status, Tool::WasmBindgen)?;
 
-    let mut cmd = Command::new(&bindgen_path?);
+    let mut cmd = Command::new(&bindgen_path);
     cmd.arg(&wasm_path)
         .arg("--out-dir")
         .arg(out_dir)
         .arg(dts_arg);
 
-    let target_arg = build_target_arg(target, bindgen_path?)?;
-    if supports_dash_dash_target(bindgen_path?.to_path_buf())? {
+    let target_arg = build_target_arg(target, &bindgen_path)?;
+    if supports_dash_dash_target(bindgen_path.to_path_buf())? {
         cmd.arg("--target").arg(target_arg);
     } else {
         cmd.arg(target_arg);
