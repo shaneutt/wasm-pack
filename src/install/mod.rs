@@ -42,7 +42,7 @@ pub fn download_prebuilt_or_cargo_install(
     cache: &Cache,
     version: &str,
     install_permitted: bool,
-) -> Result<Download, failure::Error> {
+) -> Result<Status, failure::Error> {
     // If the tool is installed globally and it has the right version, use
     // that. Assume that other tools are installed next to it.
     //
@@ -51,7 +51,7 @@ pub fn download_prebuilt_or_cargo_install(
     if let Ok(path) = which(tool.to_string()) {
         debug!("found global {} binary at: {}", tool, path.display());
         if check_version(&tool, &path, version)? {
-            return Ok(Download::at(path.parent().unwrap()));
+            return Ok(Status::Found(path.parent().unwrap().to_path_buf()));
         }
     }
 
@@ -60,7 +60,7 @@ pub fn download_prebuilt_or_cargo_install(
 
     let dl = download_prebuilt(&tool, &cache, version, install_permitted);
     match dl {
-        Ok(dl) => return Ok(dl),
+        Ok(dl) => return Ok(Status::Found(dl.binary(&tool.to_string())?)),
         Err(e) => {
             warn!(
                 "could not download pre-built `{}`: {}. Falling back to `cargo install`.",
@@ -190,7 +190,7 @@ pub fn cargo_install(
     cache: &Cache,
     version: &str,
     install_permitted: bool,
-) -> Result<Download, failure::Error> {
+) -> Result<Status, failure::Error> {
     debug!(
         "Attempting to use a `cargo install`ed version of `{}={}`",
         tool, version,
@@ -205,11 +205,11 @@ pub fn cargo_install(
             version,
             destination.display()
         );
-        return Ok(Download::at(&destination));
+        return Ok(Status::Found(destination));
     }
 
     if !install_permitted {
-        bail!("{} v{} is not installed!", tool, version)
+        return Ok(Status::CannotInstall);
     }
 
     // Run `cargo install` to a temporary location to handle ctrl-c gracefully
@@ -266,5 +266,5 @@ pub fn cargo_install(
     // Finally, move the `tmp` directory into our binary cache.
     fs::rename(&tmp, &destination)?;
 
-    Ok(Download::at(&destination))
+    Ok(Status::Found(destination))
 }
