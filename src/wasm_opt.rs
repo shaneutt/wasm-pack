@@ -1,7 +1,7 @@
 //! Support for downloading and executing `wasm-opt`
 
 use crate::child;
-use crate::install;
+use crate::install::{self, Tool};
 use crate::PBAR;
 use binary_install::Cache;
 use std::path::Path;
@@ -27,6 +27,7 @@ pub fn run(
         }
     };
 
+    let wasm_opt_path = wasm_opt.binary(&Tool::WasmOpt.to_string())?;
     PBAR.info("Optimizing wasm binaries with `wasm-opt`...");
 
     for file in out_dir.read_dir()? {
@@ -37,7 +38,7 @@ pub fn run(
         }
 
         let tmp = path.with_extension("wasm-opt.wasm");
-        let mut cmd = Command::new(&wasm_opt);
+        let mut cmd = Command::new(&wasm_opt_path);
         cmd.arg(&path).arg("-o").arg(&tmp).args(args);
         child::run(cmd, "wasm-opt")?;
         std::fs::rename(&tmp, &path)?;
@@ -58,7 +59,10 @@ pub fn find_wasm_opt(
     install_permitted: bool,
 ) -> Result<install::Status, failure::Error> {
     let version = "version_78";
-    let dl =
-        install::download_prebuilt(&install::Tool::WasmOpt, cache, version, install_permitted)?;
-    Ok(install::Status::Found(dl.binary("wasm-opt")?))
+    Ok(install::download_prebuilt(
+        &install::Tool::WasmOpt,
+        cache,
+        version,
+        install_permitted,
+    )?)
 }

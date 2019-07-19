@@ -29,12 +29,12 @@ pub enum Status {
     /// The current platform doesn't support precompiled binaries
     PlatformNotSupported,
     /// We found `wasm-opt` at the specified path
-    Found(PathBuf),
+    Found(Download),
 }
 
-pub fn get_tool_path(status: &Status, tool: Tool) -> Result<PathBuf, failure::Error> {
+pub fn get_tool_path(status: &Status, tool: Tool) -> Result<Download, failure::Error> {
     match status {
-        Status::Found(path) => Ok(path.to_path_buf()),
+        Status::Found(download) => Ok(download),
         Status::CannotInstall => bail!("Not able to find or install a local {}.", tool),
         install::Status::PlatformNotSupported => {
             bail!("{} does not currently support your platform.", tool)
@@ -62,7 +62,8 @@ pub fn download_prebuilt_or_cargo_install(
     if let Ok(path) = which(tool.to_string()) {
         debug!("found global {} binary at: {}", tool, path.display());
         if check_version(&tool, &path, version)? {
-            return Ok(Status::Found(path.parent().unwrap().to_path_buf()));
+            let download = Download::at(path.parent().unwrap());
+            return Ok(Status::Found(download));
         }
     }
 
@@ -71,7 +72,7 @@ pub fn download_prebuilt_or_cargo_install(
 
     let dl = download_prebuilt(&tool, &cache, version, install_permitted);
     match dl {
-        Ok(dl) => return Ok(Status::Found(dl.binary(&tool.to_string())?)),
+        Ok(dl) => return Ok(dl),
         Err(e) => {
             warn!(
                 "could not download pre-built `{}`: {}. Falling back to `cargo install`.",
@@ -122,7 +123,7 @@ pub fn download_prebuilt(
     cache: &Cache,
     version: &str,
     install_permitted: bool,
-) -> Result<Download, failure::Error> {
+) -> Result<Status, failure::Error> {
     let url = match prebuilt_url(tool, version) {
         Ok(url) => url,
         Err(e) => bail!(
@@ -135,22 +136,22 @@ pub fn download_prebuilt(
         Tool::WasmBindgen => {
             let binaries = &["wasm-bindgen", "wasm-bindgen-test-runner"];
             match cache.download(install_permitted, "wasm-bindgen", binaries, &url)? {
-                Some(download) => Ok(download),
+                Some(download) => Ok(Status::Found(download)),
                 None => bail!("wasm-bindgen v{} is not installed!", version),
             }
         }
         Tool::CargoGenerate => {
             let binaries = &["cargo-generate"];
             match cache.download(install_permitted, "cargo-generate", binaries, &url)? {
-                Some(download) => Ok(download),
+                Some(download) => Ok(Status::Found(download)),
                 None => bail!("cargo-generate v{} is not installed!", version),
             }
         }
         Tool::WasmOpt => {
             let binaries = &["wasm-opt"];
             match cache.download(install_permitted, "wasm-opt", binaries, &url)? {
-                Some(download) => Ok(download),
-                None => bail!("wasm-opt v{} is not installed!", version),
+                Some(download) => Ok(Status::Found(download)),
+                None => Ok(Status::CannotInstall),
             }
         }
     }
@@ -216,7 +217,8 @@ pub fn cargo_install(
             version,
             destination.display()
         );
-        return Ok(Status::Found(destination));
+        let download = Download::at(&destination);
+        return Ok(Status::Found(download));
     }
 
     if !install_permitted {
@@ -277,5 +279,6 @@ pub fn cargo_install(
     // Finally, move the `tmp` directory into our binary cache.
     fs::rename(&tmp, &destination)?;
 
-    Ok(Status::Found(destination))
+    let download = Download::at(&destination);
+    Ok(Status::Found(download))
 }

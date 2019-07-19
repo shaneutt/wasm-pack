@@ -13,7 +13,8 @@ pub fn generate(
     name: &str,
     install_status: &install::Status,
 ) -> Result<(), failure::Error> {
-    let bin_path = install::get_tool_path(install_status, Tool::CargoGenerate)?;
+    let bin_path = install::get_tool_path(install_status, Tool::CargoGenerate)?
+        .binary(&Tool::CargoGenerate.to_string())?;
     let mut cmd = Command::new(&bin_path);
     cmd.arg("generate");
     cmd.arg("--git").arg(&template);
