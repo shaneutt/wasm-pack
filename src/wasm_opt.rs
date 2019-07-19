@@ -4,7 +4,7 @@ use crate::child;
 use crate::install;
 use crate::PBAR;
 use binary_install::Cache;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 /// Execute `wasm-opt` over wasm binaries found in `out_dir`, downloading if
@@ -16,12 +16,12 @@ pub fn run(
     install_permitted: bool,
 ) -> Result<(), failure::Error> {
     let wasm_opt = match find_wasm_opt(cache, install_permitted)? {
-        WasmOpt::Found(path) => path,
-        WasmOpt::CannotInstall => {
+        install::Status::Found(path) => path,
+        install::Status::CannotInstall => {
             PBAR.info("Skipping wasm-opt as no downloading was requested");
             return Ok(());
         }
-        WasmOpt::PlatformNotSupported => {
+        install::Status::PlatformNotSupported => {
             PBAR.info("Skipping wasm-opt because it is not supported on this platform");
             return Ok(());
         }
@@ -46,16 +46,6 @@ pub fn run(
     Ok(())
 }
 
-/// Possible results of `find_wasm_opt`
-pub enum WasmOpt {
-    /// Couldn't install wasm-opt because downloads are forbidden
-    CannotInstall,
-    /// The current platform doesn't support precompiled binaries
-    PlatformNotSupported,
-    /// We found `wasm-opt` at the specified path
-    Found(PathBuf),
-}
-
 /// Attempts to find `wasm-opt` in `PATH` locally, or failing that downloads a
 /// precompiled binary.
 ///
@@ -63,9 +53,12 @@ pub enum WasmOpt {
 /// Returns `None` if a binary wasn't found in `PATH` and this platform doesn't
 /// have precompiled binaries. Returns an error if we failed to download the
 /// binary.
-pub fn find_wasm_opt(cache: &Cache, install_permitted: bool) -> Result<WasmOpt, failure::Error> {
+pub fn find_wasm_opt(
+    cache: &Cache,
+    install_permitted: bool,
+) -> Result<install::Status, failure::Error> {
     let version = "version_78";
     let dl =
         install::download_prebuilt(&install::Tool::WasmOpt, cache, version, install_permitted)?;
-    Ok(WasmOpt::Found(dl.binary("wasm-opt")?))
+    Ok(install::Status::Found(dl.binary("wasm-opt")?))
 }

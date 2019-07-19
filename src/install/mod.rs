@@ -21,6 +21,16 @@ mod tool;
 pub use self::mode::InstallMode;
 pub use self::tool::Tool;
 
+/// Possible outcomes of attempting to find/install a tool
+pub enum Status {
+    /// Couldn't install wasm-opt because downloads are forbidden
+    CannotInstall,
+    /// The current platform doesn't support precompiled binaries
+    PlatformNotSupported,
+    /// We found `wasm-opt` at the specified path
+    Found(PathBuf),
+}
+
 /// Install a cargo CLI tool
 ///
 /// Prefers an existing local install, if any exists. Then checks if there is a
