@@ -125,6 +125,13 @@ pub fn download_prebuilt(
                 None => bail!("cargo-generate v{} is not installed!", version),
             }
         }
+        Tool::WasmOpt => {
+            let binaries = &["wasm-opt"];
+            match cache.download(install_permitted, "wasm-opt", binaries, &url)? {
+                Some(download) => Ok(download),
+                None => bail!("wasm-opt v{} is not installed!", version),
+            }
+        }
     }
 }
 
@@ -154,6 +161,13 @@ fn prebuilt_url(tool: &Tool, version: &str) -> Result<String, failure::Error> {
                 "https://github.com/ashleygwilliams/cargo-generate/releases/download/v{0}/cargo-generate-v{0}-{1}.tar.gz",
                 Krate::new(&Tool::CargoGenerate)?.max_version,
                 target
+            ))
+        },
+        Tool::WasmOpt => {
+            Ok(format!(
+        "https://github.com/WebAssembly/binaryen/releases/download/{vers}/binaryen-{vers}-{target}.tar.gz",
+        vers = "version_78",
+        target = target,
             ))
         }
     }
@@ -217,12 +231,13 @@ pub fn cargo_install(
     // just want them in `$root/*` directly (which matches how the tarballs are
     // laid out, and where the rest of our code expects them to be). So we do a
     // little renaming here.
-    let binaries = match tool {
-        Tool::WasmBindgen => vec!["wasm-bindgen", "wasm-bindgen-test-runner"],
-        Tool::CargoGenerate => vec!["cargo-genrate"],
+    let binaries: Result<Vec<&str>, failure::Error> = match tool {
+        Tool::WasmBindgen => Ok(vec!["wasm-bindgen", "wasm-bindgen-test-runner"]),
+        Tool::CargoGenerate => Ok(vec!["cargo-genrate"]),
+        Tool::WasmOpt => bail!("Cannot install wasm-opt with cargo."),
     };
 
-    for b in binaries.iter().cloned() {
+    for b in binaries?.iter().cloned() {
         let from = tmp
             .join("bin")
             .join(b)
